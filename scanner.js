@@ -22,6 +22,7 @@ class Scanner {
     this.cache = options.cache !== false;
     this.verbose = options.verbose || false;
     this.policy = options.policy || {};
+    this.maxConcurrentRequests = options.maxConcurrentRequests || 5;
     this.fingerprinter = new LicenseFingerprinter();
     this._licenseCache = new Map();
   }
@@ -34,7 +35,7 @@ class Scanner {
     const startTime = Date.now();
 
     // 1. Detect which ecosystems are present
-    const activeEcosystems = this._detectEcosystems();
+    const activeEcosystems = await this._detectEcosystems();
     if (this.verbose) {
       console.error(`[scanner] Detected ecosystems: ${activeEcosystems.join(', ')}`);
     }
@@ -70,6 +71,7 @@ class Scanner {
           scanTransitive: this.scanTransitive,
           depth: this.depth,
           verbose: this.verbose,
+          maxConcurrentRequests: this.maxConcurrentRequests,
         });
 
         const packages = await resolver.resolve(manifest);
@@ -93,7 +95,7 @@ class Scanner {
   /**
    * Auto-detect which package ecosystems are present in the directory
    */
-  _detectEcosystems() {
+  async _detectEcosystems() {
     if (!this.ecosystems.includes('auto')) {
       return this.ecosystems;
     }
@@ -112,23 +114,31 @@ class Scanner {
       pub: ['pubspec.yaml', 'pubspec.lock'],
     };
 
+    let files = [];
+    try {
+      files = await fs.promises.readdir(this.dir);
+    } catch {
+      files = [];
+    }
+
     for (const [eco, indicators] of Object.entries(ECOSYSTEM_INDICATORS)) {
       for (const indicator of indicators) {
         if (indicator.includes('*')) {
-          // Glob pattern — check directory listing
           const ext = indicator.replace('*', '');
-          try {
-            const files = fs.readdirSync(this.dir);
-            if (files.some(f => f.endsWith(ext))) {
-              detected.push(eco);
-              break;
-            }
-          } catch { /* ignore */ }
-        } else {
-          if (fs.existsSync(path.join(this.dir, indicator))) {
+          if (files.some((f) => f.endsWith(ext))) {
             detected.push(eco);
             break;
           }
+          continue;
+        }
+
+        const fullPath = path.join(this.dir, indicator);
+        try {
+          await fs.promises.access(fullPath, fs.constants.F_OK);
+          detected.push(eco);
+          break;
+        } catch {
+          // File not present.
         }
       }
     }

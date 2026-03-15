@@ -13,7 +13,7 @@ class Resolver {
     this.depth = options.depth || Infinity;
     this.verbose = options.verbose || false;
     this._visited = new Set();
-    this._queue = [];
+    this.maxConcurrentRequests = Math.max(1, Number(options.maxConcurrentRequests) || 5);
   }
 
   /**
@@ -45,43 +45,48 @@ class Resolver {
     while (currentLayer.length > 0 && currentDepth <= this.depth) {
       const nextLayer = [];
 
-      for (const pkg of currentLayer) {
-        const key = `${pkg.ecosystem}:${pkg.name}@${pkg.version}`;
-        if (this._visited.has(key)) continue;
-        this._visited.add(key);
+      for (let i = 0; i < currentLayer.length; i += this.maxConcurrentRequests) {
+        const chunk = currentLayer.slice(i, i + this.maxConcurrentRequests);
+        const results = await Promise.all(chunk.map(async (pkg) => {
+          const key = `${pkg.ecosystem}:${pkg.name}@${pkg.version}`;
+          if (this._visited.has(key)) return { pkg, deps: [] };
+          this._visited.add(key);
 
-        // Fetch the full package info including its own dependencies
-        let deps = [];
-        try {
-          const info = await this.parser.fetchPackageInfo(pkg.name, pkg.version);
-          deps = info.dependencies || [];
-          // Enrich pkg with fetched metadata
-          if (info.license && (!pkg.license || pkg.license === 'UNKNOWN')) {
-            pkg.license = info.license;
+          let deps = [];
+          try {
+            const info = await this.parser.fetchPackageInfo(pkg.name, pkg.version);
+            deps = info.dependencies || [];
+            if (info.license && (!pkg.license || pkg.license === 'UNKNOWN')) {
+              pkg.license = info.license;
+            }
+            if (info.description && !pkg.description) pkg.description = info.description;
+            if (info.repositoryUrl && !pkg.repositoryUrl) pkg.repositoryUrl = info.repositoryUrl;
+            if (info.homepage && !pkg.homepage) pkg.homepage = info.homepage;
+            if (info.author && !pkg.author) pkg.author = info.author;
+            if (info.licenseText && !pkg.licenseText) pkg.licenseText = info.licenseText;
+          } catch (err) {
+            if (this.verbose) {
+              console.error(`[resolver] Could not fetch info for ${pkg.name}@${pkg.version}: ${err.message}`);
+            }
           }
-          if (info.description && !pkg.description) pkg.description = info.description;
-          if (info.repositoryUrl && !pkg.repositoryUrl) pkg.repositoryUrl = info.repositoryUrl;
-          if (info.homepage && !pkg.homepage) pkg.homepage = info.homepage;
-          if (info.author && !pkg.author) pkg.author = info.author;
-          if (info.licenseText && !pkg.licenseText) pkg.licenseText = info.licenseText;
-        } catch (err) {
-          if (this.verbose) {
-            console.error(`[resolver] Could not fetch info for ${pkg.name}@${pkg.version}: ${err.message}`);
-          }
-        }
 
-        for (const dep of deps) {
-          const depKey = `${dep.ecosystem || pkg.ecosystem}:${dep.name}@${dep.version}`;
-          if (!this._visited.has(depKey)) {
-            const transitivePkg = {
-              ...dep,
-              ecosystem: dep.ecosystem || pkg.ecosystem,
-              direct: false,
-              dependencyDepth: currentDepth,
-              dependencyPath: `${pkg.name} > ${dep.name}`,
-            };
-            nextLayer.push(transitivePkg);
-            all.push(transitivePkg);
+          return { pkg, deps };
+        }));
+
+        for (const { pkg, deps } of results) {
+          for (const dep of deps) {
+            const depKey = `${dep.ecosystem || pkg.ecosystem}:${dep.name}@${dep.version}`;
+            if (!this._visited.has(depKey)) {
+              const transitivePkg = {
+                ...dep,
+                ecosystem: dep.ecosystem || pkg.ecosystem,
+                direct: false,
+                dependencyDepth: currentDepth,
+                dependencyPath: `${pkg.name} > ${dep.name}`,
+              };
+              nextLayer.push(transitivePkg);
+              all.push(transitivePkg);
+            }
           }
         }
       }

@@ -24,14 +24,18 @@ class BaseEcosystem {
    * Find all relevant manifest files in the project directory
    */
   async findManifests() {
-    const found = [];
-    for (const filename of this.manifestFiles) {
+    const checks = await Promise.all(this.manifestFiles.map(async (filename) => {
       const fullPath = path.join(this.dir, filename);
-      if (fs.existsSync(fullPath)) {
-        found.push(fullPath);
+      try {
+        await fs.promises.access(fullPath, fs.constants.F_OK);
+        return fullPath;
+      } catch {
+        return null;
       }
-    }
-    return found;
+    }));
+
+    // Preserve manifestFiles ordering while still checking in parallel.
+    return checks.filter(Boolean);
   }
 
   /**
