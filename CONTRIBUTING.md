@@ -107,7 +107,7 @@ myeco: () => require('./myeco'),
 ## Reporting Security Issues
 
 **Do not open a public issue for security vulnerabilities.**
-Email `security@your-org.com` with the details. We'll respond within 48 hours.
+Email `inuse.ph@gmail.com` with the details. We'll respond within 48 hours.
 
 ## License
 
