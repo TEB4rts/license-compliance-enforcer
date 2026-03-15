@@ -1,0 +1,33 @@
+# examples/startup-policy.yml
+# Recommended for SaaS / commercial products
+# Blocks anything that requires open-sourcing your code
+
+policy:
+  name: "Startup SaaS"
+  preset: startup
+
+  blocked_licenses:
+    - GPL-2.0-only
+    - GPL-2.0-or-later
+    - GPL-3.0-only
+    - GPL-3.0-or-later
+    - AGPL-3.0-only
+    - AGPL-3.0-or-later
+    - SSPL-1.0
+    - BUSL-1.1
+    - UNLICENSED
+
+  allowed_types:
+    - permissive
+    - public-domain
+
+  require_commercial: true
+  block_unknown: true
+  scan_transitive: true
+
+  sbom:
+    enabled: true
+    formats: [cyclonedx, spdx]
+    output_dir: ./sbom
+
+  exceptions: []

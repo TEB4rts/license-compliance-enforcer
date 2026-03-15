@@ -1,0 +1,102 @@
+# examples/github-action-usage.yml
+# Copy this to .github/workflows/license-check.yml in your project
+
+name: License Compliance
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  schedule:
+    # Run weekly on Monday at 9am UTC — catches newly-relicensed packages
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+  pull-requests: write  # Required for PR comments
+
+jobs:
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Install your project's dependencies first ──
+      # npm:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # pip (uncomment if needed):
+      # - uses: actions/setup-python@v5
+      #   with: { python-version: '3.11' }
+      # - run: pip install -r requirements.txt
+
+      # cargo (uncomment if needed):
+      # - uses: dtolnay/rust-toolchain@stable
+
+      # ── Run the license check ──
+      - name: License Compliance Check
+        id: license-check
+        uses: your-org/license-compliance-enforcer@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Choose a preset or point to your policy.yml
+          policy: startup           # startup | enterprise | open-source | permissive-only | ./policy.yml
+
+          ecosystems: auto          # auto-detect, or: npm,pip,cargo,go,maven,rubygems
+
+          fail-on-violation: true   # Fail CI on any violation
+
+          generate-sbom: true       # CycloneDX + SPDX
+          sbom-format: all
+
+          post-pr-comment: true     # Post report on the PR
+
+          scan-transitive: true     # Check ALL transitive deps
+
+          block-on-unknown: true    # Fail if license can't be determined
+
+          working-directory: .      # Set if your code is in a subdirectory
+
+      # ── Show outputs ──
+      - name: Print scan summary
+        if: always()
+        run: |
+          echo "Packages scanned : ${{ steps.license-check.outputs.packages-scanned }}"
+          echo "Violations       : ${{ steps.license-check.outputs.violations-count }}"
+          echo "Warnings         : ${{ steps.license-check.outputs.warnings-count }}"
+          echo "Compliant        : ${{ steps.license-check.outputs.compliant }}"
+
+      # ── Upload SBOM as artifact ──
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          retention-days: 365  # Keep for 1 year (EO-14028 compliance)
+
+      # ── Upload report ──
+      - name: Upload compliance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report-${{ github.sha }}
+          path: ${{ steps.license-check.outputs.report-path }}
+          retention-days: 90
+
+      # ── Optional: Upload SARIF to GitHub Code Scanning ──
+      # - name: Upload SARIF to GitHub Security
+      #   if: always()
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: /tmp/lce-report.sarif

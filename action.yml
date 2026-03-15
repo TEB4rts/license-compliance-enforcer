@@ -1,0 +1,87 @@
+# action/action.yml
+name: 'License Compliance Enforcer'
+description: 'Free, advanced license compliance enforcement for every ecosystem. Blocks non-compliant deps before they hit production.'
+author: 'license-compliance-enforcer contributors'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  policy:
+    description: 'Policy preset (startup|enterprise|open-source|permissive-only) or path to policy.yml'
+    required: false
+    default: 'startup'
+
+  ecosystems:
+    description: 'Comma-separated list of ecosystems to scan, or "auto" to detect'
+    required: false
+    default: 'auto'
+
+  fail-on-violation:
+    description: 'Fail the workflow if violations are found'
+    required: false
+    default: 'true'
+
+  generate-sbom:
+    description: 'Generate a Software Bill of Materials (SBOM)'
+    required: false
+    default: 'true'
+
+  sbom-format:
+    description: 'SBOM format: cyclonedx | spdx | all'
+    required: false
+    default: 'all'
+
+  post-pr-comment:
+    description: 'Post a compliance report as a PR comment'
+    required: false
+    default: 'true'
+
+  block-on-unknown:
+    description: 'Block if license cannot be determined'
+    required: false
+    default: 'true'
+
+  scan-transitive:
+    description: 'Scan transitive (indirect) dependencies'
+    required: false
+    default: 'true'
+
+  exceptions-file:
+    description: 'Path to exceptions file (overrides inline exceptions in policy.yml)'
+    required: false
+    default: ''
+
+  upload-sbom:
+    description: 'Upload SBOM as a workflow artifact'
+    required: false
+    default: 'true'
+
+  report-format:
+    description: 'Report format: text | markdown | json | sarif'
+    required: false
+    default: 'markdown'
+
+  working-directory:
+    description: 'Directory to scan (default: repo root)'
+    required: false
+    default: '.'
+
+outputs:
+  violations-count:
+    description: 'Number of license violations found'
+  warnings-count:
+    description: 'Number of warnings found'
+  packages-scanned:
+    description: 'Total number of packages scanned'
+  compliant:
+    description: 'true if no violations found, false otherwise'
+  sbom-path:
+    description: 'Path to the generated SBOM file(s)'
+  report-path:
+    description: 'Path to the compliance report'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

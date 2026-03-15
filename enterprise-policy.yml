@@ -1,0 +1,55 @@
+# examples/enterprise-policy.yml
+# Maximum legal protection — blocks ALL copyleft, LGPL, MPL
+# Use when IP protection and patent safety are paramount
+
+policy:
+  name: "Enterprise Strict"
+  preset: enterprise
+
+  blocked_licenses:
+    - GPL-2.0-only
+    - GPL-2.0-or-later
+    - GPL-3.0-only
+    - GPL-3.0-or-later
+    - AGPL-3.0-only
+    - AGPL-3.0-or-later
+    - LGPL-2.0-only
+    - LGPL-2.0-or-later
+    - LGPL-2.1-only
+    - LGPL-2.1-or-later
+    - LGPL-3.0-only
+    - LGPL-3.0-or-later
+    - MPL-2.0
+    - EUPL-1.2
+    - CDDL-1.0
+    - EPL-1.0
+    - EPL-2.0
+    - SSPL-1.0
+    - BUSL-1.1
+    - UNLICENSED
+
+  allowed_types:
+    - permissive
+    - public-domain
+
+  require_commercial: true
+  block_unknown: true
+  scan_transitive: true
+  max_depth: 10
+
+  sbom:
+    enabled: true
+    formats: [cyclonedx, spdx]
+    output_dir: ./sbom
+    include_dev_deps: false
+
+  # Pre-approved exceptions (always require legal sign-off)
+  exceptions:
+    # Example: an LGPL package isolated in a subprocess
+    # - package: "some-lgpl-tool"
+    #   ecosystem: npm
+    #   version: ">=1.0.0"
+    #   reason: "Used as external CLI subprocess only — not linked. Approved by legal 2024-03-01"
+    #   approved_by: "legal@company.com"
+    #   expires: "2025-03-01"
+    #   ticket: "LEGAL-42"
