@@ -1,10 +1,15 @@
 // src/core/policy-loader.js
 'use strict';
 
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 const yaml = require('js-yaml');
+const Ajv = require('ajv');
+const schema = require('./policy-schema.json');
 const { POLICY_PRESETS } = require('./policy-engine');
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validatePolicySchema = ajv.compile(schema);
 
 /**
  * Load and validate a policy configuration
@@ -19,9 +24,9 @@ async function loadPolicy(policyPath) {
 
   const resolvedPath = path.resolve(policyPath);
 
-  // Does the file exist?
-  if (!fs.existsSync(resolvedPath)) {
-    // If the default policy.yml doesn't exist, fall back to startup preset
+  try {
+    await fs.access(resolvedPath);
+  } catch {
     if (policyPath === './policy.yml' || policyPath === 'policy.yml') {
       console.warn('[policy] No policy.yml found, using default "startup" preset.');
       return { preset: 'startup', ...POLICY_PRESETS.startup };
@@ -29,24 +34,18 @@ async function loadPolicy(policyPath) {
     throw new Error(`Policy file not found: ${resolvedPath}`);
   }
 
-  const raw = fs.readFileSync(resolvedPath, 'utf8');
+  const raw = await fs.readFile(resolvedPath, 'utf8');
   const parsed = yaml.load(raw);
 
-  if (!parsed || !parsed.policy) {
-    throw new Error(`Invalid policy.yml: must have a top-level "policy" key`);
+  if (!validatePolicySchema(parsed)) {
+    const details = validatePolicySchema.errors.map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
+    throw new Error(`Invalid policy.yml schema: ${details}`);
   }
 
   const policy = parsed.policy;
 
-  // Validate exceptions
   if (policy.exceptions) {
     for (const ex of policy.exceptions) {
-      if (!ex.package) {
-        throw new Error(`Invalid exception in policy.yml: missing "package" field`);
-      }
-      if (!ex.reason) {
-        console.warn(`[policy] Exception for "${ex.package}" has no reason — please document why it was approved.`);
-      }
       if (!ex.approved_by) {
         console.warn(`[policy] Exception for "${ex.package}" has no approved_by — consider adding a legal contact.`);
       }

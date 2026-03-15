@@ -2,9 +2,10 @@
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs/promises');
 const https = require('https');
 const http = require('http');
+const logger = require('./logger');
 
 /**
  * BaseEcosystem - shared logic for all ecosystem parsers
@@ -20,18 +21,41 @@ class BaseEcosystem {
   get name() { throw new Error('Ecosystem must define a name'); }
   get manifestFiles() { throw new Error('Ecosystem must define manifestFiles'); }
 
+  async pathExists(filePath) {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async readTextFile(filePath) {
+    return fs.readFile(filePath, 'utf8');
+  }
+
+  async readJsonFile(filePath) {
+    return JSON.parse(await this.readTextFile(filePath));
+  }
+
+  warn(message) {
+    logger.warn(`[${this.name}] ${message}`);
+  }
+
+  debug(message) {
+    if (this.verbose) logger.info(`[${this.name}] ${message}`);
+  }
+
   /**
    * Find all relevant manifest files in the project directory
    */
   async findManifests() {
-    const found = [];
-    for (const filename of this.manifestFiles) {
+    const checks = this.manifestFiles.map(async (filename) => {
       const fullPath = path.join(this.dir, filename);
-      if (fs.existsSync(fullPath)) {
-        found.push(fullPath);
-      }
-    }
-    return found;
+      return (await this.pathExists(fullPath)) ? fullPath : null;
+    });
+
+    return (await Promise.all(checks)).filter(Boolean);
   }
 
   /**

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://license-compliance-enforcer.dev/schemas/policy.schema.json",
+  "type": "object",
+  "required": ["policy"],
+  "properties": {
+    "policy": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "preset": { "type": "string", "enum": ["startup", "enterprise", "open-source", "permissive-only"] },
+        "blocked_licenses": { "type": "array", "items": { "type": "string" } },
+        "allowed_types": { "type": "array", "items": { "type": "string" } },
+        "require_commercial": { "type": "boolean" },
+        "block_unknown": { "type": "boolean" },
+        "scan_transitive": { "type": "boolean" },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["package", "reason"],
+            "properties": {
+              "package": { "type": "string" },
+              "version": { "type": "string" },
+              "ecosystem": { "type": "string" },
+              "reason": { "type": "string" },
+              "approved_by": { "type": "string" },
+              "expires": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

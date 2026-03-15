@@ -13,9 +13,24 @@ class Resolver {
     this.depth = options.depth || Infinity;
     this.verbose = options.verbose || false;
     this._visited = new Set();
-    this._queue = [];
+    this.maxConcurrentFetches = Math.max(1, options.maxConcurrentFetches || 6);
   }
 
+
+  async _mapWithConcurrency(items, worker) {
+    const results = [];
+    let cursor = 0;
+
+    const runners = Array.from({ length: Math.min(this.maxConcurrentFetches, items.length) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await worker(items[index]);
+      }
+    });
+
+    await Promise.all(runners);
+    return results;
+  }
   /**
    * Resolve all dependencies from a manifest file
    * @param {string} manifestPath - Path to the manifest file
@@ -45,20 +60,16 @@ class Resolver {
     while (currentLayer.length > 0 && currentDepth <= this.depth) {
       const nextLayer = [];
 
-      for (const pkg of currentLayer) {
+      await this._mapWithConcurrency(currentLayer, async (pkg) => {
         const key = `${pkg.ecosystem}:${pkg.name}@${pkg.version}`;
-        if (this._visited.has(key)) continue;
+        if (this._visited.has(key)) return;
         this._visited.add(key);
 
-        // Fetch the full package info including its own dependencies
         let deps = [];
         try {
           const info = await this.parser.fetchPackageInfo(pkg.name, pkg.version);
           deps = info.dependencies || [];
-          // Enrich pkg with fetched metadata
-          if (info.license && (!pkg.license || pkg.license === 'UNKNOWN')) {
-            pkg.license = info.license;
-          }
+          if (info.license && (!pkg.license || pkg.license === 'UNKNOWN')) pkg.license = info.license;
           if (info.description && !pkg.description) pkg.description = info.description;
           if (info.repositoryUrl && !pkg.repositoryUrl) pkg.repositoryUrl = info.repositoryUrl;
           if (info.homepage && !pkg.homepage) pkg.homepage = info.homepage;
@@ -84,7 +95,7 @@ class Resolver {
             all.push(transitivePkg);
           }
         }
-      }
+      });
 
       currentLayer = nextLayer;
       currentDepth++;

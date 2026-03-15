@@ -18,6 +18,7 @@ module.exports = function registerScan(program) {
     .option('--no-fail-on-violation', 'Do not exit 1 on violations')
     .option('--no-scan-transitive', 'Only scan direct dependencies')
     .option('--depth <n>', 'Max transitive depth (default: unlimited)', parseInt)
+    .option('--concurrency <n>', 'Max concurrent registry requests', parseInt, 6)
     .option('--no-cache', 'Skip the dependency cache')
     .option('--quiet', 'Suppress output except errors and final status')
     .option('--verbose', 'Verbose output including all dep info')
@@ -41,6 +42,7 @@ module.exports = function registerScan(program) {
           depth: opts.depth,
           cache: opts.cache !== false,
           verbose: opts.verbose,
+          maxConcurrentFetches: opts.concurrency,
         });
 
         const spinner = opts.quiet ? null : logger.spinner('Scanning dependencies...');
